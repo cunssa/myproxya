@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MyProxy · 个人订阅中心</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1020;--panel:#121a2d;--line:#27334c;--muted:#91a0ba;--text:#edf3ff;--accent:#8da8ff}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(900px 500px at 10% -10%,#20345f 0,transparent 60%),var(--bg);color:var(--text);font:15px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}
+.wrap{max-width:920px;margin:48px auto;padding:0 20px}.brand{font-size:25px;font-weight:800}.brand span{color:var(--accent)}.tag{color:var(--muted);font-size:11px;letter-spacing:2px}
+.panel{background:rgba(18,26,45,.96);border:1px solid var(--line);border-radius:18px;padding:24px;margin:18px 0;box-shadow:0 18px 50px #0003}
+h1{font-size:23px;margin:0 0 5px}h2{font-size:17px;margin:24px 0 10px}.muted{color:var(--muted)}label{display:block;color:#b8c5dc;font-size:13px;margin:14px 0 6px}
+input,textarea{width:100%;background:#0b1325;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:12px;font:inherit;outline:none}input:focus,textarea:focus{border-color:var(--accent)}
+textarea{min-height:310px;resize:vertical;font:13px/1.55 ui-monospace,Consolas,monospace}
+button{border:0;border-radius:10px;background:var(--accent);color:#081127;padding:11px 16px;font-weight:750;cursor:pointer}button.secondary{background:#26334e;color:var(--text)}button.danger{background:#572638;color:#ffe8ee}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.row>*{flex:1}.hidden{display:none!important}.notice{padding:11px 13px;border-radius:10px;background:#182642;color:#d4e0fa;margin:12px 0;overflow-wrap:anywhere}
+.linkbox{padding:13px;border:1px dashed #465b87;border-radius:10px;background:#0b1325;overflow-wrap:anywhere}a{color:#b7c8ff}
+@media(max-width:650px){.wrap{margin:24px auto}.panel{padding:18px}.row>*{flex-basis:100%}}
+</style></head><body><main class="wrap">
+<header><div class="brand">My<span>Proxy</span></div><div class="tag">PERSONAL SUBSCRIPTION CENTER</div></header>
+<section class="panel" id="login"><h1>欢迎回来</h1><div class="muted">个人订阅管理 · 仅管理员可访问</div>
+<label>管理员密码</label><input id="password" type="password" autocomplete="current-password" placeholder="输入管理员密码">
+<button id="loginBtn" style="margin-top:14px">登录</button><div id="loginMsg" class="notice hidden"></div></section>
+<section class="panel hidden" id="app"><div class="row"><div><h1>我的唯一配置</h1><div class="muted">始终使用同一个订阅地址；保存修改不会改变链接。</div></div><button class="secondary" id="logoutBtn">退出</button></div>
+<label>配置内容（Mihomo / FlClash YAML）</label><textarea id="yaml" spellcheck="false" placeholder="在这里粘贴你的 Mihomo YAML 配置"></textarea>
+<div class="row" style="margin-top:14px"><button id="saveBtn">保存配置</button><button class="secondary" id="exportBtn">导出备份</button><button class="secondary" id="importBtn">从备份恢复</button></div>
+<input id="backupFile" type="file" accept=".yaml,.yml,.txt" class="hidden">
+<div id="appMsg" class="notice hidden"></div>
+<h2>固定订阅链接</h2><div class="linkbox" id="subUrl">登录后加载</div><div class="row" style="margin-top:12px"><button class="secondary" id="copyBtn">复制订阅链接</button><button class="danger" id="deleteBtn">删除当前配置</button></div>
+<p class="muted" style="font-size:12px;margin-top:16px">订阅链接等同于访问凭证，请勿公开分享。删除配置后，订阅地址将暂时返回 404；重新保存配置后可继续使用原地址。</p>
+</section></main>
+<script>
+const $=id=>document.getElementById(id);let adminKey="",subPath="";
+function msg(id,t){$(id).textContent=t;$(id).classList.remove("hidden")}
+async function api(action,extra={}){const r=await fetch("/api/admin",{method:"POST",headers:{"Content-Type":"application/json","X-Admin-Key":adminKey},body:JSON.stringify({action,...extra})});const j=await r.json().catch(()=>({error:"服务器响应异常"}));if(!r.ok)throw Error(j.error||"请求失败");return j}
+async function load(){const j=await api("get");$("yaml").value=j.yaml||"";subPath=j.path||"";$("subUrl").textContent=subPath?location.origin+subPath:"尚未生成订阅链接"}
+$("loginBtn").onclick=async()=>{adminKey=$("password").value;if(!adminKey)return msg("loginMsg","请输入管理员密码");try{await load();$("login").classList.add("hidden");$("app").classList.remove("hidden")}catch(e){adminKey="";msg("loginMsg",e.message)}};
+$("logoutBtn").onclick=()=>{adminKey="";$("password").value="";$("app").classList.add("hidden");$("login").classList.remove("hidden")};
+$("saveBtn").onclick=async()=>{try{const j=await api("save",{yaml:$("yaml").value});subPath=j.path;$("subUrl").textContent=location.origin+subPath;msg("appMsg","保存成功。固定订阅链接没有变化。")}catch(e){msg("appMsg",e.message)}};
+$("copyBtn").onclick=async()=>{if(!subPath)return msg("appMsg","请先保存配置");try{await navigator.clipboard.writeText(location.origin+subPath);msg("appMsg","订阅链接已复制。")}catch(e){msg("appMsg","浏览器不允许自动复制，请手动复制上方链接。")}};
+$("exportBtn").onclick=()=>{const blob=new Blob([$("yaml").value],{type:"text/yaml;charset=utf-8"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="myproxy-backup.yaml";a.click();URL.revokeObjectURL(a.href)};
+$("importBtn").onclick=()=>$("backupFile").click();
+$("backupFile").onchange=async e=>{const f=e.target.files[0];if(f){$("yaml").value=await f.text();msg("appMsg","备份已载入编辑框，请点击“保存配置”完成恢复。"}};
+$("deleteBtn").onclick=async()=>{if(!confirm("确定删除唯一配置？订阅链接将暂时失效。"))return;try{await api("delete");$("yaml").value="";msg("appMsg","配置已删除，固定订阅链接保留。")}catch(e){msg("appMsg",e.message)}};
+</script></body></html>
